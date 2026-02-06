@@ -1,100 +1,100 @@
 import streamlit as st
-import google.generativeai as genai
+import time
+# Pastikan modul-modul ini ada (kode di bawah)
+from modules.structure_manager import validate_inputs
+from modules.generator import generate_note
 
-# Import modul buatan kita sendiri
-from modules import prompts
-from modules import database as db
-from modules.formatter import convert_tags_to_obsidian
+# --- KONFIG HALAMAN ---
+st.set_page_config(page_title="NeuroNote AI", page_icon="🧠", layout="wide")
 
-# --- CONFIG ---
-st.set_page_config(page_title="MedWiki Crowdsourced", page_icon="🧬", layout="wide")
+# CSS Custom (Dark Mode Optimized)
+st.markdown("""
+<style>
+    .stApp {background-color: #0e1117;}
+    .stButton>button {background-color: #7c4dff; color: white; border-radius: 8px; height: 3em; font-weight: bold;}
+    h1 {color: #7c4dff;}
+    .stTextArea textarea {font-family: 'Consolas', monospace;}
+</style>
+""", unsafe_allow_html=True)
 
-# Setup Google Gemini
-try:
-    genai.configure(api_key=st.secrets["general"]["GOOGLE_API_KEY"])
-except Exception:
-    st.error("⚠️ API Key Google belum diset di .streamlit/secrets.toml")
+# --- SESSION STATE (Agar hasil gak hilang) ---
+if "generated_result" not in st.session_state:
+    st.session_state.generated_result = None
 
-# --- CORE LOGIC ---
-def process_new_topic(topic):
-    """
-    Fungsi ini menjalankan orkestrasi:
-    Prompting -> AI Generating -> Formatting (Tag to Obsidian) -> Saving DB
-    """
-    # 1. Tentukan Struktur Bab (Bisa dibuat dinamis nanti)
-    structure = """
-    1. Definisi & Klasifikasi (The Map)
-    2. Patofisiologi & Mekanisme Molekuler (The Deep Dive)
-    3. Manifestasi Klinis & Red Flags (The Clinical Anchor)
-    """
-    
-    # 2. Ambil Prompt "Trojan Horse"
-    final_prompt = prompts.get_main_prompt(topic, structure)
-    
-    # 3. Panggil Koki (Gemini)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    with st.spinner(f"🧠 Sedang membedah molekuler '{topic}'..."):
-        try:
-            response = model.generate_content(final_prompt)
-            raw_text = response.text
-            
-            # 4. POST-PROCESSING (The Magic Step)
-            # Ubah tag <<<...>>> menjadi format Obsidian > [!note]
-            clean_text = convert_tags_to_obsidian(raw_text)
-            
-            return clean_text
-        except Exception as e:
-            st.error(f"Gagal generate: {e}")
-            return None
+# --- SIDEBAR ---
+with st.sidebar:
+    st.title("🧠 NeuroNote")
+    api_key = st.text_input("API Key (Google):", type="password", help="Masukkan API Key Gemini di sini")
+    model_choice = st.selectbox("Model:", ["gemini-1.5-flash", "gemini-2.0-flash-exp"], index=0)
+    st.info("💡 **Workflow:**\n1. Bikin struktur di Gemini Web/ChatGPT.\n2. Paste di 'Struktur Bab'.\n3. Biar tools ini yang isi dagingnya.")
 
-# --- UI FRONTEND ---
-st.title("🧬 Medical Knowledge Base")
-st.caption("Active Prediction Engine • Crowdsourced • Obsidian Ready")
+# --- UI UTAMA ---
+st.title("Medical Note Generator")
+st.caption("Human Structure x AI Content")
 
-# Input Area
-col1, col2 = st.columns([3, 1])
+col1, col2 = st.columns([1, 1])
+
 with col1:
-    topic_input = st.text_input("Topik Medis:", placeholder="Contoh: Gagal Jantung Kongestif")
+    topic = st.text_input("Judul Topik:", placeholder="Cth: Diabetes Melitus Tipe 2")
+    material = st.text_area("Materi Mentah (Opsional):", height=200, help="Paste teks buku/jurnal di sini kalau ada sumber khusus.")
+
 with col2:
-    force_regen = st.checkbox("Paksa Generate Ulang", help="Abaikan database, minta AI buat baru.")
+    structure = st.text_area("📋 Struktur Bab (Wajib):", height=275, 
+                             placeholder="Paste Outline Bab disini...\n1. Definisi\n2. Patofisiologi\n...",
+                             help="AI DILARANG mengubah urutan ini. Dia cuma akan mengisi konten di bawah sub-bab ini.")
 
-# Tombol Eksekusi
-if st.button("Bedah Topik Ini 🚀", type="primary"):
-    if not topic_input:
-        st.warning("Isi dulu topiknya, Dok.")
+btn = st.button("🚀 GENERATE CATATAN", use_container_width=True)
+
+if btn:
+    # 1. Validasi Input
+    is_valid, msg = validate_inputs(topic, structure)
+    
+    if not api_key:
+        st.error("⚠️ Masukkan API Key di sidebar dulu!")
+    elif not is_valid:
+        st.warning(msg)
     else:
-        final_content = None
-        source_info = ""
-        
-        # A. STRATEGI: CEK DATABASE DULU
-        if not force_regen:
-            db_data = db.fetch_note_from_db(topic_input)
-            if db_data:
-                final_content = db_data['content_md']
-                source_info = "⚡ **DATABASE CACHE** (Cepat & Hemat Token)"
-                st.toast("Data ditemukan di Supabase!", icon="✅")
-        
-        # B. STRATEGI: GENERATE JIKA KOSONG / DIPAKSA
-        if not final_content:
-            final_content = process_new_topic(topic_input)
-            if final_content:
-                source_info = "🧠 **AI GENERATED** (Fresh from Gemini)"
-                # Simpan hasil yang SUDAH DIFORMAT ke Database
-                db.save_note_to_db(topic_input, final_content)
-                st.toast("Data baru disimpan ke Supabase!", icon="💾")
+        # 2. Proses
+        with st.status("Sedang bekerja...", expanded=True) as status:
+            st.write("🔒 Mengunci Struktur User...")
+            st.write("💉 Menyuntikkan 'Daging' (Deep Dive & Clinical)...")
+            st.write("🎨 Mewarnai Mermaid & Formatting Obsidian...")
+            
+            start = time.time()
+            
+            # Panggil Backend Generator
+            result = generate_note(api_key, model_choice, topic, structure, material)
+            
+            # Handling Error dari Backend
+            if result.startswith("ERROR_QUOTA"):
+                status.update(label="Gagal!", state="error")
+                st.error("🚨 KUOTA HABIS (Error 429). Ganti model atau tunggu sebentar.")
+            elif result.startswith("ERROR_SYSTEM"):
+                status.update(label="Error Sistem!", state="error")
+                st.error(result)
+            else:
+                st.session_state.generated_result = result # Simpan ke session
+                status.update(label="Selesai!", state="complete", expanded=False)
+                st.success(f"Selesai dalam {round(time.time()-start, 1)} detik!")
 
-        # C. TAMPILKAN HASIL
-        if final_content:
-            st.divider()
-            st.markdown(f"<small>{source_info}</small>", unsafe_allow_html=True)
-            
-            # Render Markdown di Layar
-            st.markdown(final_content)
-            
-            st.divider()
-            st.subheader("📂 Siap Masuk Obsidian")
-            st.info("Copy kode di bawah, lalu PASTE di Obsidian. Mermaid & Callout akan otomatis aktif.")
-            
-            # Code block agar user tinggal klik tombol copy
-            st.code(final_content, language="markdown")
+# --- OUTPUT DISPLAY ---
+if st.session_state.generated_result:
+    st.divider()
+    
+    # Buat Tab biar rapi: Preview (Visual) vs Source Code (Buat Copas)
+    tab_preview, tab_code = st.tabs(["👁️ Preview Render", "📝 Source Code (Copy Obsidian)"])
+    
+    with tab_preview:
+        st.markdown(st.session_state.generated_result)
+        
+    with tab_code:
+        st.markdown("Salin kode di bawah ini langsung ke Obsidian:")
+        st.code(st.session_state.generated_result, language="markdown")
+    
+    # Download Button
+    st.download_button(
+        label="💾 Download File .md", 
+        data=st.session_state.generated_result, 
+        file_name=f"{topic.replace(' ', '_')}.md",
+        mime="text/markdown"
+    )

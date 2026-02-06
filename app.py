@@ -18,7 +18,16 @@ st.markdown("""
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🧠 NeuroNote")
-    api_key = st.text_input("API Key:", type="password")
+    
+    # LOGIKA BARU: Cek Secrets dulu
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        st.success("✅ API Key Terdeteksi (Auto)")
+    else:
+        # Kalau tidak ada secrets, minta input manual
+        api_key = st.text_input("API Key:", type="password", help="Masukkan Key manual karena secrets belum diset.")
+
+    st.divider()
     model_choice = st.selectbox("Model:", ["gemini-2.5-flash", "gemini-1.5-flash"])
     st.info("Tips: Gunakan Gemini Web untuk menyusun struktur, lalu paste di sini.")
 

@@ -83,10 +83,11 @@ with st.sidebar:
     
     # 1. Pilihan Model (Lengkap)
     model_options = [
-        "gemini-2.0-flash-exp",  # Paling Cepat & Baru (Experimental)
-        "gemini-1.5-pro",        # Paling Pintar (Context Window Besar)
-        "gemini-1.5-flash",      # Standard Cepat & Stabil
-        "gemini-1.5-flash-8b",   # Versi Ringan
+        "gemini-3-pro-preview",  # Paling Cepat & Baru (Experimental)
+        "gemini-3-flash-preview",        # Paling Pintar (Context Window Besar)
+        "gemini-2.5-flash",      # Standard Cepat & Stabil
+        "gemini-2.5-flash-lite",   # Versi Ringan
+        "gemini-2.5-pro",
     ]
     
     model_choice = st.selectbox(

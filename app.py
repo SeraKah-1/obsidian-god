@@ -1,98 +1,100 @@
 import streamlit as st
 import google.generativeai as genai
+
+# Import modul buatan kita sendiri
 from modules import prompts
 from modules import database as db
+from modules.formatter import convert_tags_to_obsidian
 
-# 1. Konfigurasi Halaman & API
+# --- CONFIG ---
 st.set_page_config(page_title="MedWiki Crowdsourced", page_icon="🧬", layout="wide")
 
+# Setup Google Gemini
 try:
     genai.configure(api_key=st.secrets["general"]["GOOGLE_API_KEY"])
-except Exception as e:
-    st.error("⚠️ Lupa masukin API Key Google di secrets.toml ya?")
+except Exception:
+    st.error("⚠️ API Key Google belum diset di .streamlit/secrets.toml")
 
-# 2. Fungsi Utama: Generate Materi Baru (The Chef)
-def generate_new_material(topic):
-    # Struktur standar (bisa dikembangkan nanti)
+# --- CORE LOGIC ---
+def process_new_topic(topic):
+    """
+    Fungsi ini menjalankan orkestrasi:
+    Prompting -> AI Generating -> Formatting (Tag to Obsidian) -> Saving DB
+    """
+    # 1. Tentukan Struktur Bab (Bisa dibuat dinamis nanti)
     structure = """
-    1. Definisi & Patofisiologi
-    2. Etiologi & Faktor Risiko
-    3. Manifestasi Klinis (Tanda & Gejala)
-    4. Diagnosis & Pemeriksaan Penunjang
-    5. Tatalaksana & Farmakologi
+    1. Definisi & Klasifikasi (The Map)
+    2. Patofisiologi & Mekanisme Molekuler (The Deep Dive)
+    3. Manifestasi Klinis & Red Flags (The Clinical Anchor)
     """
     
-    # Ambil prompt rahasia "Trojan Horse"
-    final_prompt = prompts.get_main_prompt(topic, structure, "General Medical Knowledge")
+    # 2. Ambil Prompt "Trojan Horse"
+    final_prompt = prompts.get_main_prompt(topic, structure)
     
-    # Panggil Gemini
-    model = genai.GenerativeModel('gemini-1.5-flash') # Pakai Flash biar cepat & murah
-    with st.spinner(f"🧠 Sedang meracik materi '{topic}' dari nol... (Sabar ya)"):
-        response = model.generate_content(final_prompt)
-        return response.text
+    # 3. Panggil Koki (Gemini)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    with st.spinner(f"🧠 Sedang membedah molekuler '{topic}'..."):
+        try:
+            response = model.generate_content(final_prompt)
+            raw_text = response.text
+            
+            # 4. POST-PROCESSING (The Magic Step)
+            # Ubah tag <<<...>>> menjadi format Obsidian > [!note]
+            clean_text = convert_tags_to_obsidian(raw_text)
+            
+            return clean_text
+        except Exception as e:
+            st.error(f"Gagal generate: {e}")
+            return None
 
-# 3. UI Frontend
+# --- UI FRONTEND ---
 st.title("🧬 Medical Knowledge Base")
-st.caption("Crowdsourced by AI, Saved for Humanity.")
+st.caption("Active Prediction Engine • Crowdsourced • Obsidian Ready")
 
-# Input User
+# Input Area
 col1, col2 = st.columns([3, 1])
 with col1:
-    topic_input = st.text_input("Mau belajar apa hari ini?", placeholder="Contoh: Gagal Jantung Kongestif")
+    topic_input = st.text_input("Topik Medis:", placeholder="Contoh: Gagal Jantung Kongestif")
 with col2:
-    # Opsi buat kalau user merasa data di database jelek/salah
-    force_regen = st.checkbox("Paksa Generate Ulang", help="Centang ini kalau mau ignore database dan minta AI bikin baru.")
+    force_regen = st.checkbox("Paksa Generate Ulang", help="Abaikan database, minta AI buat baru.")
 
-# Tombol Aksi
-if st.button("Pelajari Sekarang 🚀", type="primary"):
+# Tombol Eksekusi
+if st.button("Bedah Topik Ini 🚀", type="primary"):
     if not topic_input:
-        st.warning("Isi topiknya dulu dong, Dok.")
+        st.warning("Isi dulu topiknya, Dok.")
     else:
-        content_to_display = None
-        source_label = ""
+        final_content = None
+        source_info = ""
         
-        # --- LOGIKA "CEK DATABASE DULU" ---
-        
-        # 1. Cek DB jika user TIDAK mencentang "Paksa Generate"
+        # A. STRATEGI: CEK DATABASE DULU
         if not force_regen:
             db_data = db.fetch_note_from_db(topic_input)
-            
             if db_data:
-                # KASUS A: Barang ada di Gudang
-                content_to_display = db_data['content_md']
-                source_label = "⚡ Diambil dari Database (Hemat Token!)"
-                st.toast("Materi ditemukan di database! Loading instan.", icon="⚡")
+                final_content = db_data['content_md']
+                source_info = "⚡ **DATABASE CACHE** (Cepat & Hemat Token)"
+                st.toast("Data ditemukan di Supabase!", icon="✅")
         
-        # 2. Jika tidak ketemu di DB ATAU User maksa generate ulang
-        if not content_to_display:
-            try:
-                # KASUS B: Barang kosong, panggil AI
-                generated_text = generate_new_material(topic_input)
-                
-                if generated_text:
-                    content_to_display = generated_text
-                    source_label = "🧠 Baru saja digenerate oleh AI"
-                    
-                    # Simpan ke Database buat user berikutnya!
-                    db.save_note_to_db(topic_input, generated_text)
-                    st.toast("Materi baru berhasil disimpan ke Supabase!", icon="💾")
-            except Exception as e:
-                st.error(f"Yah error waktu generate: {e}")
+        # B. STRATEGI: GENERATE JIKA KOSONG / DIPAKSA
+        if not final_content:
+            final_content = process_new_topic(topic_input)
+            if final_content:
+                source_info = "🧠 **AI GENERATED** (Fresh from Gemini)"
+                # Simpan hasil yang SUDAH DIFORMAT ke Database
+                db.save_note_to_db(topic_input, final_content)
+                st.toast("Data baru disimpan ke Supabase!", icon="💾")
 
-        # --- TAMPILAN HASIL ---
-        
-        if content_to_display:
+        # C. TAMPILKAN HASIL
+        if final_content:
             st.divider()
-            st.info(f"Sumber: {source_label}")
+            st.markdown(f"<small>{source_info}</small>", unsafe_allow_html=True)
             
-            # Render Markdown Cantik
-            st.markdown(content_to_display)
+            # Render Markdown di Layar
+            st.markdown(final_content)
             
             st.divider()
+            st.subheader("📂 Siap Masuk Obsidian")
+            st.info("Copy kode di bawah, lalu PASTE di Obsidian. Mermaid & Callout akan otomatis aktif.")
             
-            # --- FITUR OBSIDIAN (COPY PASTE) ---
-            st.subheader("📂 Simpan ke Obsidian")
-            st.write("Klik ikon **Copy** di pojok kanan kotak bawah ini, lalu Paste di Obsidianmu.")
-            
-            # Tampilkan raw markdown di dalam code block biar tombol copy muncul otomatis
-            st.code(content_to_display, language="markdown")
+            # Code block agar user tinggal klik tombol copy
+            st.code(final_content, language="markdown")

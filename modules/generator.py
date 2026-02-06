@@ -21,7 +21,7 @@ def generate_note(api_key, model_choice, topic, structure, material=""):
             "temperature": 0.4,
             "top_p": 0.95,
             "top_k": 40,
-            "max_output_tokens": 30000, # Token maksimal (cukup untuk bab panjang)
+            "max_output_tokens": 50000, # Token maksimal (cukup untuk bab panjang)
         }
         
         # Pastikan nama model valid

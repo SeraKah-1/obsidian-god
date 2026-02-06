@@ -1,31 +1,27 @@
-# modules/structure_manager.py
-
-def format_user_structure(raw_structure_text):
-    """
-    Mengambil teks struktur mentah dari user dan membungkusnya 
-    dengan instruksi ketat agar AI patuh.
-    """
-    if not raw_structure_text:
-        return ""
-
-    # Kita bungkus dengan tag XML-style semu agar AI fokus
-    formatted = f"""
-    <LOCKED_STRUCTURE_PROTOCOL>
-    PERINGATAN KERAS KEPADA AI:
-    Ini adalah KERANGKA YANG TIDAK BOLEH DIUBAH.
-    Anda dilarang keras menambah Bab baru atau menghilangkan Bab yang ada.
-    Ikuti urutan ini poin demi poin:
-    
-    {raw_structure_text}
-    
-    </LOCKED_STRUCTURE_PROTOCOL>
-    """
-    return formatted
-
 def validate_inputs(topic, structure):
-    """Cek apakah input user kosong"""
-    if not topic or len(topic) < 3:
-        return False, "⚠️ Judul topik terlalu pendek!"
-    if not structure or len(structure) < 10:
-        return False, "⚠️ Struktur belum diisi dengan benar!"
+    """
+    Fungsi Validasi Input.
+    Mencegah request kosong dikirim ke API (Hemat Kuota & Waktu).
+    
+    Args:
+        topic (str): Judul topik dari user.
+        structure (str): Kerangka bab dari user.
+        
+    Returns:
+        tuple: (bool: is_valid, str: error_message)
+    """
+    
+    # 1. Cek Topik
+    if not topic or not topic.strip():
+        return False, "Judul Topik tidak boleh kosong!"
+        
+    # 2. Cek Struktur
+    if not structure or not structure.strip():
+        return False, "Struktur Bab wajib diisi! Copy outline dari Gemini/ChatGPT dulu."
+        
+    # 3. Cek Panjang Struktur (Biar gak cuma nulis "bab 1" doang)
+    if len(structure) < 15:
+        return False, "Struktur terlalu pendek. Berikan kerangka yang jelas (min. 15 karakter)."
+        
+    # Kalau lolos semua
     return True, ""

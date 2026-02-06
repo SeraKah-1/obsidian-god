@@ -1,100 +1,161 @@
 import streamlit as st
 import time
-# Pastikan modul-modul ini ada (kode di bawah)
+
+# Kita import fungsi dari modul yang AKAN kita buat setelah ini
+# Jangan khawatir jika masih merah/error di editor, itu karena file modules/ belum dibuat.
 from modules.structure_manager import validate_inputs
 from modules.generator import generate_note
 
-# --- KONFIG HALAMAN ---
-st.set_page_config(page_title="NeuroNote AI", page_icon="🧠", layout="wide")
+# --- 1. KONFIGURASI HALAMAN & STATE ---
+st.set_page_config(
+    page_title="NeuroNote AI", 
+    page_icon="🧠", 
+    layout="wide"
+)
 
-# CSS Custom (Dark Mode Optimized)
-st.markdown("""
-<style>
-    .stApp {background-color: #0e1117;}
-    .stButton>button {background-color: #7c4dff; color: white; border-radius: 8px; height: 3em; font-weight: bold;}
-    h1 {color: #7c4dff;}
-    .stTextArea textarea {font-family: 'Consolas', monospace;}
-</style>
-""", unsafe_allow_html=True)
-
-# --- SESSION STATE (Agar hasil gak hilang) ---
+# Inisialisasi Session State (Agar hasil generate tidak hilang saat klik tab/tombol lain)
 if "generated_result" not in st.session_state:
     st.session_state.generated_result = None
 
-# --- SIDEBAR ---
+# --- 2. CSS CUSTOM (Dark Mode & Tampilan Rapi) ---
+st.markdown("""
+<style>
+    /* Background & Warna Dasar */
+    .stApp {background-color: #0e1117;}
+    h1, h2, h3 {color: #7c4dff !important;}
+    
+    /* Tombol Utama */
+    .stButton>button {
+        background-color: #7c4dff; 
+        color: white; 
+        border-radius: 8px; 
+        height: 3em; 
+        font-weight: bold;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #651fff;
+        color: white;
+    }
+
+    /* Text Area Font (Monospace biar struktur terlihat rapi) */
+    .stTextArea textarea {
+        font-family: 'Consolas', 'Courier New', monospace;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- 3. SIDEBAR (Pengaturan) ---
 with st.sidebar:
     st.title("🧠 NeuroNote")
-    api_key = st.text_input("API Key (Google):", type="password", help="Masukkan API Key Gemini di sini")
-    model_choice = st.selectbox("Model:", ["gemini-1.5-flash", "gemini-2.0-flash-exp"], index=0)
-    st.info("💡 **Workflow:**\n1. Bikin struktur di Gemini Web/ChatGPT.\n2. Paste di 'Struktur Bab'.\n3. Biar tools ini yang isi dagingnya.")
+    st.caption("v2.0 • Strict Structure Mode")
+    
+    st.divider()
+    
+    # Input API Key
+    api_key = st.text_input("🔑 Google AI API Key:", type="password", help="Wajib diisi untuk mengakses Gemini.")
+    
+    # Pilihan Model
+    model_choice = st.selectbox(
+        "🤖 Model AI:", 
+        ["gemini-1.5-flash", "gemini-2.0-flash-exp"], 
+        index=0,
+        help="Gunakan Flash untuk kecepatan, 2.0 untuk logika yang lebih tajam."
+    )
+    
+    st.divider()
+    st.info(
+        "**💡 Cara Pakai:**\n"
+        "1. Minta ChatGPT/Gemini Web buatkan outline materi.\n"
+        "2. Copy outline tersebut.\n"
+        "3. Paste di kolom 'Struktur Bab' di kanan.\n"
+        "4. Tools ini akan mengisi kontennya."
+    )
 
-# --- UI UTAMA ---
+# --- 4. UI UTAMA (Input Data) ---
 st.title("Medical Note Generator")
-st.caption("Human Structure x AI Content")
+st.caption("Human Structure × AI Content • Obsidian Ready")
 
+# Layout 2 Kolom
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    topic = st.text_input("Judul Topik:", placeholder="Cth: Diabetes Melitus Tipe 2")
-    material = st.text_area("Materi Mentah (Opsional):", height=200, help="Paste teks buku/jurnal di sini kalau ada sumber khusus.")
+    # Input Topik & Materi Tambahan
+    topic = st.text_input("🩺 Judul Topik / Penyakit:", placeholder="Contoh: Gagal Jantung Kongestif")
+    material = st.text_area(
+        "📚 Materi Mentah / Referensi (Opsional):", 
+        height=200, 
+        help="Jika kosong, AI akan menggunakan pengetahuan umumnya. Jika diisi, AI akan memprioritaskan teks ini.",
+        placeholder="Paste teks dari buku ajar, jurnal, atau catatan kuliah di sini..."
+    )
 
 with col2:
-    structure = st.text_area("📋 Struktur Bab (Wajib):", height=275, 
-                             placeholder="Paste Outline Bab disini...\n1. Definisi\n2. Patofisiologi\n...",
-                             help="AI DILARANG mengubah urutan ini. Dia cuma akan mengisi konten di bawah sub-bab ini.")
+    # Input Struktur (FOKUS UTAMA)
+    structure = st.text_area(
+        "📋 Struktur Bab (Wajib Diisi):", 
+        height=275, 
+        placeholder="1. Definisi & Klasifikasi\n2. Etiologi & Faktor Risiko\n3. Patofisiologi (Mekanisme)\n4. Manifestasi Klinis\n5. Tata Laksana...",
+        help="AI DILARANG mengubah urutan ini. Dia hanya akan mengisi konten di bawah judul-judul ini."
+    )
 
-btn = st.button("🚀 GENERATE CATATAN", use_container_width=True)
+# Tombol Eksekusi
+generate_btn = st.button("🚀 ISI STRUKTUR & GENERATE", use_container_width=True)
 
-if btn:
-    # 1. Validasi Input
-    is_valid, msg = validate_inputs(topic, structure)
+# --- 5. LOGIKA EKSEKUSI ---
+if generate_btn:
+    # A. Validasi Input dulu
+    is_valid, error_msg = validate_inputs(topic, structure)
     
     if not api_key:
-        st.error("⚠️ Masukkan API Key di sidebar dulu!")
+        st.error("⚠️ API Key belum diisi di Sidebar!")
     elif not is_valid:
-        st.warning(msg)
+        st.warning(f"⚠️ {error_msg}")
     else:
-        # 2. Proses
+        # B. Proses Generate
         with st.status("Sedang bekerja...", expanded=True) as status:
             st.write("🔒 Mengunci Struktur User...")
-            st.write("💉 Menyuntikkan 'Daging' (Deep Dive & Clinical)...")
-            st.write("🎨 Mewarnai Mermaid & Formatting Obsidian...")
+            st.write("💉 Menyuntikkan Analisis Deep Dive & Klinis...")
+            st.write("🎨 Mewarnai Diagram Mermaid & Formatting...")
             
-            start = time.time()
+            start_time = time.time()
             
-            # Panggil Backend Generator
+            # Panggil Backend (generator.py)
             result = generate_note(api_key, model_choice, topic, structure, material)
             
-            # Handling Error dari Backend
+            # C. Cek Hasil
             if result.startswith("ERROR_QUOTA"):
                 status.update(label="Gagal!", state="error")
-                st.error("🚨 KUOTA HABIS (Error 429). Ganti model atau tunggu sebentar.")
+                st.error("🚨 KUOTA API HABIS (Error 429). Tunggu sebentar atau ganti akun.")
             elif result.startswith("ERROR_SYSTEM"):
-                status.update(label="Error Sistem!", state="error")
-                st.error(result)
+                status.update(label="Error Sistem", state="error")
+                st.error(f"Terjadi kesalahan: {result}")
             else:
-                st.session_state.generated_result = result # Simpan ke session
+                # SUKSES: Simpan ke Session State
+                st.session_state.generated_result = result
                 status.update(label="Selesai!", state="complete", expanded=False)
-                st.success(f"Selesai dalam {round(time.time()-start, 1)} detik!")
+                st.success(f"Catatan selesai dibuat dalam {round(time.time() - start_time, 1)} detik!")
 
-# --- OUTPUT DISPLAY ---
+# --- 6. OUTPUT DISPLAY (Hasil) ---
+# Tampilkan hanya jika ada hasil di session state
 if st.session_state.generated_result:
     st.divider()
+    st.subheader("📂 Hasil Output")
     
-    # Buat Tab biar rapi: Preview (Visual) vs Source Code (Buat Copas)
-    tab_preview, tab_code = st.tabs(["👁️ Preview Render", "📝 Source Code (Copy Obsidian)"])
+    # Tabs: Preview Visual vs Source Code
+    tab_preview, tab_code = st.tabs(["👁️ Preview Render", "📝 Source Code (Copy ke Obsidian)"])
     
     with tab_preview:
         st.markdown(st.session_state.generated_result)
         
     with tab_code:
-        st.markdown("Salin kode di bawah ini langsung ke Obsidian:")
+        st.info("Klik tombol di pojok kanan atas kotak kode untuk menyalin semua.")
         st.code(st.session_state.generated_result, language="markdown")
     
-    # Download Button
+    # Tombol Download File
     st.download_button(
-        label="💾 Download File .md", 
-        data=st.session_state.generated_result, 
+        label="💾 Download File (.md)",
+        data=st.session_state.generated_result,
         file_name=f"{topic.replace(' ', '_')}.md",
-        mime="text/markdown"
+        mime="text/markdown",
+        type="primary"
     )

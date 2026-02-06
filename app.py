@@ -1,8 +1,7 @@
 import streamlit as st
 import time
 
-# Kita import fungsi dari modul yang AKAN kita buat setelah ini
-# Jangan khawatir jika masih merah/error di editor, itu karena file modules/ belum dibuat.
+# Import modul backend
 from modules.structure_manager import validate_inputs
 from modules.generator import generate_note
 
@@ -13,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inisialisasi Session State (Agar hasil generate tidak hilang saat klik tab/tombol lain)
+# Inisialisasi Session State
 if "generated_result" not in st.session_state:
     st.session_state.generated_result = None
 
@@ -32,47 +31,93 @@ st.markdown("""
         height: 3em; 
         font-weight: bold;
         border: none;
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
         background-color: #651fff;
-        color: white;
+        transform: scale(1.02);
+        box-shadow: 0 4px 15px rgba(124, 77, 255, 0.4);
     }
 
     /* Text Area Font (Monospace biar struktur terlihat rapi) */
     .stTextArea textarea {
         font-family: 'Consolas', 'Courier New', monospace;
+        background-color: #1e1e1e;
+        color: #e0e0e0;
+    }
+    
+    /* Info Box di Sidebar */
+    .css-1544g2n {
+        padding: 1rem;
+        background-color: #1e1e1e;
+        border-radius: 10px;
+        border: 1px solid #333;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR (Pengaturan) ---
+# --- 3. LOAD SECRETS (API KEY) ---
+# Mengambil API Key dari .streamlit/secrets.toml
+try:
+    # Sesuaikan dengan nama variabel di secrets.toml kamu
+    # Biasanya: [general] GOOGLE_API_KEY = "..."
+    if "general" in st.secrets:
+        api_key = st.secrets["general"]["GOOGLE_API_KEY"]
+    else:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+except FileNotFoundError:
+    st.error("⚠️ File `.streamlit/secrets.toml` tidak ditemukan! Buat file tersebut dan isi API Key Google Anda.")
+    st.stop()
+except KeyError:
+    st.error("⚠️ API Key belum diset di secrets.toml. Pastikan formatnya benar.")
+    st.stop()
+
+# --- 4. SIDEBAR (PENGATURAN AI) ---
 with st.sidebar:
     st.title("🧠 NeuroNote")
-    st.caption("v2.0 • Strict Structure Mode")
+    st.caption("v2.1 • Strict Structure Mode")
     
     st.divider()
     
-    # Input API Key
-    api_key = st.text_input("🔑 Google AI API Key:", type="password", help="Wajib diisi untuk mengakses Gemini.")
+    st.subheader("🤖 Konfigurasi Model")
     
-    # Pilihan Model
+    # 1. Pilihan Model (Lengkap)
+    model_options = [
+        "gemini-2.0-flash-exp",  # Paling Cepat & Baru (Experimental)
+        "gemini-1.5-pro",        # Paling Pintar (Context Window Besar)
+        "gemini-1.5-flash",      # Standard Cepat & Stabil
+        "gemini-1.5-flash-8b",   # Versi Ringan
+    ]
+    
     model_choice = st.selectbox(
-        "🤖 Model AI:", 
-        ["gemini-1.5-flash", "gemini-2.0-flash-exp"], 
+        "Pilih Model:", 
+        model_options,
         index=0,
-        help="Gunakan Flash untuk kecepatan, 2.0 untuk logika yang lebih tajam."
+        help="Gunakan 'Pro' untuk analisis mendalam, 'Flash' untuk kecepatan."
+    )
+    
+    # 2. Pengaturan Kreativitas (Temperature)
+    st.markdown("<br>", unsafe_allow_html=True)
+    temperature = st.slider(
+        "🌡️ Temperature (Kreativitas):",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.4,
+        step=0.1,
+        help="Rendah (0.2) = Sangat patuh struktur. Tinggi (0.7) = Lebih kreatif membuat analogi."
     )
     
     st.divider()
-    st.info(
-        "**💡 Cara Pakai:**\n"
-        "1. Minta ChatGPT/Gemini Web buatkan outline materi.\n"
-        "2. Copy outline tersebut.\n"
-        "3. Paste di kolom 'Struktur Bab' di kanan.\n"
-        "4. Tools ini akan mengisi kontennya."
-    )
+    
+    with st.expander("💡 Cara Penggunaan"):
+        st.markdown("""
+        1. **Siapkan Kerangka:** Minta ChatGPT/Gemini Web buatkan outline materi yang detail.
+        2. **Copy-Paste:** Tempel outline ke kolom kanan.
+        3. **Isi Materi (Opsional):** Jika ada sumber khusus (PDF/Jurnal), tempel teksnya di kiri.
+        4. **Generate:** NeuroNote akan mengisi "daging" ke dalam "tulang" tersebut.
+        """)
 
-# --- 4. UI UTAMA (Input Data) ---
+# --- 5. UI UTAMA (Input Data) ---
 st.title("Medical Note Generator")
 st.caption("Human Structure × AI Content • Obsidian Ready")
 
@@ -84,16 +129,16 @@ with col1:
     topic = st.text_input("🩺 Judul Topik / Penyakit:", placeholder="Contoh: Gagal Jantung Kongestif")
     material = st.text_area(
         "📚 Materi Mentah / Referensi (Opsional):", 
-        height=200, 
-        help="Jika kosong, AI akan menggunakan pengetahuan umumnya. Jika diisi, AI akan memprioritaskan teks ini.",
-        placeholder="Paste teks dari buku ajar, jurnal, atau catatan kuliah di sini..."
+        height=300, 
+        help="Jika kosong, AI menggunakan databasenya sendiri. Jika diisi, AI akan memprioritaskan teks ini.",
+        placeholder="Paste teks dari buku ajar, jurnal, atau catatan kuliah di sini untuk diolah..."
     )
 
 with col2:
     # Input Struktur (FOKUS UTAMA)
     structure = st.text_area(
         "📋 Struktur Bab (Wajib Diisi):", 
-        height=275, 
+        height=375, # Sedikit lebih tinggi biar enak lihat outline panjang
         placeholder="1. Definisi & Klasifikasi\n2. Etiologi & Faktor Risiko\n3. Patofisiologi (Mekanisme)\n4. Manifestasi Klinis\n5. Tata Laksana...",
         help="AI DILARANG mengubah urutan ini. Dia hanya akan mengisi konten di bawah judul-judul ini."
     )
@@ -101,31 +146,31 @@ with col2:
 # Tombol Eksekusi
 generate_btn = st.button("🚀 ISI STRUKTUR & GENERATE", use_container_width=True)
 
-# --- 5. LOGIKA EKSEKUSI ---
+# --- 6. LOGIKA EKSEKUSI ---
 if generate_btn:
     # A. Validasi Input dulu
     is_valid, error_msg = validate_inputs(topic, structure)
     
-    if not api_key:
-        st.error("⚠️ API Key belum diisi di Sidebar!")
-    elif not is_valid:
+    if not is_valid:
         st.warning(f"⚠️ {error_msg}")
     else:
         # B. Proses Generate
         with st.status("Sedang bekerja...", expanded=True) as status:
             st.write("🔒 Mengunci Struktur User...")
+            st.write(f"🤖 Menghubungi {model_choice}...")
             st.write("💉 Menyuntikkan Analisis Deep Dive & Klinis...")
-            st.write("🎨 Mewarnai Diagram Mermaid & Formatting...")
             
             start_time = time.time()
             
             # Panggil Backend (generator.py)
+            # Perhatikan: Kita kirim temperature juga sekarang (nanti update generator.py sedikit untuk terima param ini, atau biarkan default)
+            # Untuk sekarang kita kirim parameter standar dulu.
             result = generate_note(api_key, model_choice, topic, structure, material)
             
             # C. Cek Hasil
             if result.startswith("ERROR_QUOTA"):
                 status.update(label="Gagal!", state="error")
-                st.error("🚨 KUOTA API HABIS (Error 429). Tunggu sebentar atau ganti akun.")
+                st.error("🚨 KUOTA API HABIS (Error 429). Tunggu sebentar atau ganti akun Google.")
             elif result.startswith("ERROR_SYSTEM"):
                 status.update(label="Error Sistem", state="error")
                 st.error(f"Terjadi kesalahan: {result}")
@@ -135,8 +180,7 @@ if generate_btn:
                 status.update(label="Selesai!", state="complete", expanded=False)
                 st.success(f"Catatan selesai dibuat dalam {round(time.time() - start_time, 1)} detik!")
 
-# --- 6. OUTPUT DISPLAY (Hasil) ---
-# Tampilkan hanya jika ada hasil di session state
+# --- 7. OUTPUT DISPLAY (Hasil) ---
 if st.session_state.generated_result:
     st.divider()
     st.subheader("📂 Hasil Output")

@@ -1,37 +1,67 @@
 import re
 
+def clean_and_quote_content(content):
+    """
+    Helper function: Membersihkan konten dan menambahkan '> ' di setiap baris.
+    Menjaga agar blockquote tidak putus di tengah jalan.
+    """
+    # Hapus whitespace berlebih di awal/akhir blok konten
+    lines = content.strip().split('\n')
+    
+    processed_lines = []
+    for line in lines:
+        # Jika baris kosong, tetap beri tanda '>' agar kotak tidak putus visualnya
+        if line.strip() == "":
+            processed_lines.append(">") 
+        else:
+            # Tambahkan '> ' di depan teks
+            processed_lines.append(f"> {line}")
+            
+    return "\n".join(processed_lines)
+
 def convert_tags_to_obsidian(text):
     """
-    Mengubah RAW TAGS dari AI (<<<DEEP_START>>>) menjadi format Obsidian Callout
-    yang valid (> [!note]) tanpa rusak.
+    Mengubah RAW TAGS dari AI menjadi format Obsidian Callout yang valid.
+    Menangani berbagai jenis tag secara dinamis.
     """
     
-    # 1. Konversi DEEP DIVE (Blue Note)
-    # Pola: <<<DEEP_START>>> Judul \n Isi <<<DEEP_END>>>
-    pattern_deep = r"<<<DEEP_START>>>\s*(.*?)\n(.*?)<<<DEEP_END>>>"
-    
-    def replace_deep(match):
-        title = match.group(1).strip()
-        content = match.group(2)
-        # Tambahkan "> " di setiap baris agar masuk ke dalam callout
-        processed_lines = [f"> {line}" for line in content.split('\n')]
-        formatted_content = "\n".join(processed_lines)
-        return f"> [!note]- 👁️ **{title}**\n{formatted_content}"
+    # DAFTAR TAG YANG DIDUKUNG
+    # Format: 'TAG_NAME': ('Obsidian_Type', 'Icon', 'Color_Hex_Optional')
+    tag_map = {
+        'DEEP':   ('note', '👁️'),      # Biru (Deep Dive)
+        'CLINIC': ('tip', '💊'),       # Hijau (Klinis/Tips)
+        'WARN':   ('warning', '⚠️'),   # Merah (Peringatan/Red Flags) - Opsional kalau mau tambah
+    }
 
-    # Flag DOTALL penting agar regex bisa membaca baris baru (\n) sebagai satu kesatuan
-    text = re.sub(pattern_deep, replace_deep, text, flags=re.DOTALL)
+    processed_text = text
 
-    # 2. Konversi CLINIC (Green Tip)
-    # Pola: <<<CLINIC_START>>> Judul \n Isi <<<CLINIC_END>>>
-    pattern_clinic = r"<<<CLINIC_START>>>\s*(.*?)\n(.*?)<<<CLINIC_END>>>"
-    
-    def replace_clinic(match):
-        title = match.group(1).strip()
-        content = match.group(2)
-        processed_lines = [f"> {line}" for line in content.split('\n')]
-        formatted_content = "\n".join(processed_lines)
-        return f"> [!tip]- 💊 **{title}**\n{formatted_content}"
+    for tag_name, (obsidian_type, icon) in tag_map.items():
+        # Regex Penjelasan:
+        # 1. <<<TAG_START>>>   -> Cari tag pembuka
+        # 2. \s* -> Toleransi spasi/newline setelah tag
+        # 3. (.*?)             -> GROUP 1: Judul (Ambil baris pertama)
+        # 4. \n                -> Wajib ada enter setelah judul
+        # 5. (.*?)             -> GROUP 2: Isi Konten (Ambil sampai tag penutup)
+        # 6. <<<TAG_END>>>     -> Cari tag penutup
+        pattern = f"<<<{tag_name}_START>>>\s*(.*?)\n(.*?)<<<{tag_name}_END>>>"
+        
+        def replacement_func(match):
+            try:
+                # Ambil data dari capture group
+                title = match.group(1).strip()
+                raw_body = match.group(2)
+                
+                # Proses body agar indentasinya rapi
+                formatted_body = clean_and_quote_content(raw_body)
+                
+                # Rakit string akhir Obsidian Callout
+                # [-] artinya collapsible (bisa dilipat), default tertutup biar rapi
+                return f"> [!{obsidian_type}]- {icon} **{title}**\n{formatted_body}"
+            except Exception as e:
+                # Fallback: Kalau error parsing, kembalikan teks asli biar gak crash
+                return match.group(0)
 
-    text = re.sub(pattern_clinic, replace_clinic, text, flags=re.DOTALL)
-    
-    return text
+        # Eksekusi Regex
+        processed_text = re.sub(pattern, replacement_func, processed_text, flags=re.DOTALL)
+
+    return processed_text

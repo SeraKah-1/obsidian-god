@@ -83,7 +83,7 @@ with st.sidebar:
     
     # 1. Pilihan Model (Lengkap)
     model_options = [
-        "gemini-3-pro-preview",  # Paling Cepat & Baru (Experimental)
+        "gemma-2-27b-it",  # Paling Cepat & Baru (Experimental)
         "gemini-3-flash-preview",        # Paling Pintar (Context Window Besar)
         "gemini-2.5-flash",      # Standard Cepat & Stabil
         "gemini-2.5-flash-lite",   # Versi Ringan

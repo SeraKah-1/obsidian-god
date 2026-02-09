@@ -1,6 +1,8 @@
 import streamlit as st
 import time
 from modules.sanitizer import fix_mermaid_syntax
+from modules.structure_manager import validate_inputs
+from modules.generator import generate_note
 
 # Import modul backend
 from modules.structure_manager import validate_inputs

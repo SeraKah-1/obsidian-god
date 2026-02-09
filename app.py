@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+from modules.sanitizer import fix_mermaid_syntax
 
 # Import modul backend
 from modules.structure_manager import validate_inputs
@@ -204,3 +205,15 @@ if st.session_state.generated_result:
         mime="text/markdown",
         type="primary"
     )
+if generate_btn:
+    # ... proses generate berjalan ...
+    raw_output = generator.generate_note(...) 
+    
+    # --- STEP BARU: CUCI MERMAIDNYA DULU ---
+    clean_output = fix_mermaid_syntax(raw_output)
+    
+    # Tampilkan hasil yang sudah bersih
+    st.markdown(clean_output)
+    
+    # Simpan hasil bersih ke session state untuk download
+    st.session_state['generated_content'] = clean_output

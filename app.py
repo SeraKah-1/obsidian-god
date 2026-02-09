@@ -207,4 +207,3 @@ if st.session_state.generated_result:
         mime="text/markdown",
         type="primary"
     )
-    

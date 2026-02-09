@@ -4,9 +4,7 @@ from modules.sanitizer import fix_mermaid_syntax
 from modules.structure_manager import validate_inputs
 from modules.generator import generate_note
 
-# Import modul backend
-from modules.structure_manager import validate_inputs
-from modules.generator import generate_note
+# (Hapus baris "from modules..." yang duplikat di bawah sini jika ada)
 
 # --- 1. KONFIGURASI HALAMAN & STATE ---
 st.set_page_config(
@@ -209,11 +207,6 @@ if st.session_state.generated_result:
         mime="text/markdown",
         type="primary"
     )
-# --- HAPUS DARI SINI SAMPAI BAWAH ---
-if generate_btn:
-    # ... proses generate berjalan ...
-    raw_output = generator.generate_note(...) 
-    
     # --- STEP BARU: CUCI MERMAIDNYA DULU ---
     clean_output = fix_mermaid_syntax(raw_output)
     

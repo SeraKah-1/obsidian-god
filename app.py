@@ -207,15 +207,39 @@ if st.session_state.generated_result:
         mime="text/markdown",
         type="primary"
     )
+# --- 6. LOGIKA EKSEKUSI ---
 if generate_btn:
-    # ... proses generate berjalan ...
-    raw_output = generator.generate_note(...) 
+    # A. Validasi Input dulu
+    is_valid, error_msg = validate_inputs(topic, structure)
     
-    # --- STEP BARU: CUCI MERMAIDNYA DULU ---
-    clean_output = fix_mermaid_syntax(raw_output)
-    
-    # Tampilkan hasil yang sudah bersih
-    st.markdown(clean_output)
-    
-    # Simpan hasil bersih ke session state untuk download
-    st.session_state['generated_content'] = clean_output
+    if not is_valid:
+        st.warning(f"⚠️ {error_msg}")
+    else:
+        # B. Proses Generate
+        with st.status("Sedang bekerja...", expanded=True) as status:
+            st.write("🔒 Mengunci Struktur User...")
+            st.write(f"🤖 Menghubungi {model_choice}...")
+            
+            start_time = time.time()
+            
+            # --- PERBAIKAN DI SINI ---
+            # 1. Panggil langsung (JANGAN pakai 'generator.')
+            # 2. Tampung ke variabel 'raw_result' dulu
+            raw_result = generate_note(api_key, model_choice, topic, structure, material)
+            
+            # C. Cek Hasil
+            if raw_result.startswith("ERROR_QUOTA"):
+                status.update(label="Gagal!", state="error")
+                st.error("🚨 KUOTA API HABIS (Error 429).")
+            elif raw_result.startswith("ERROR_SYSTEM"):
+                status.update(label="Error Sistem", state="error")
+                st.error(f"Terjadi kesalahan: {raw_result}")
+            else:
+                # --- SISIPKAN PEMBERSIH MERMAID DI SINI ---
+                st.write("🧹 Membersihkan Sintaks Mermaid...")
+                clean_result = fix_mermaid_syntax(raw_result)
+                
+                # SUKSES: Simpan hasil BERSIH ke Session State
+                st.session_state.generated_result = clean_result
+                status.update(label="Selesai!", state="complete", expanded=False)
+                st.success(f"Catatan selesai dibuat dalam {round(time.time() - start_time, 1)} detik!")

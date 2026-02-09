@@ -207,19 +207,4 @@ if st.session_state.generated_result:
         mime="text/markdown",
         type="primary"
     )
-    # --- STEP BARU: CUCI MERMAIDNYA DULU ---
-    clean_output = fix_mermaid_syntax(raw_output)
     
-    # Tampilkan hasil yang sudah bersih
-    st.markdown(clean_output)
-    
-    # Simpan hasil bersih ke session state untuk download
-    st.session_state['generated_content'] = clean_output
-                # --- SISIPKAN PEMBERSIH MERMAID DI SINI ---
-                st.write("🧹 Membersihkan Sintaks Mermaid...")
-                clean_result = fix_mermaid_syntax(raw_result)
-                
-                # SUKSES: Simpan hasil BERSIH ke Session State
-                st.session_state.generated_result = clean_result
-                status.update(label="Selesai!", state="complete", expanded=False)
-                st.success(f"Catatan selesai dibuat dalam {round(time.time() - start_time, 1)} detik!")
